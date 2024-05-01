@@ -1,5 +1,4 @@
 import tkinter as tk
-from tkinter import filedialog
 import qrcode
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
@@ -12,6 +11,8 @@ class QRCodeGeneratorApp:
         self.master.title("QR Code Generator")
 
         self.mode = tk.StringVar(value="single")
+        self.qr_size = tk.StringVar(value="10")
+        self.saved_location = tk.StringVar(value="")
 
         self.single_entry_frame = tk.Frame(master)
         self.bulk_entry_frame = tk.Frame(master)
@@ -28,6 +29,15 @@ class QRCodeGeneratorApp:
                        command=self.show_frame).grid(row=0, column=1, padx=10, pady=5)
         tk.Radiobutton(self.master, text="Random Entry", variable=self.mode, value="random",
                        command=self.show_frame).grid(row=0, column=2, padx=10, pady=5)
+
+        # QR Size options
+        qr_sizes = [("10x10", "10"), ("20x20", "20"), ("30x30", "30")]
+        for size, value in qr_sizes:
+            tk.Radiobutton(self.master, text=size, variable=self.qr_size, value=value).grid(row=1, column=qr_sizes.index((size, value)), padx=10, pady=5)
+
+        # Label to show saved location
+        self.saved_location_label = tk.Label(self.master, textvariable=self.saved_location)
+        self.saved_location_label.grid(row=2, column=0, columnspan=3, padx=10, pady=5)
 
         # Single Entry Frame
         tk.Label(self.single_entry_frame, text="Enter TEXT:").pack()
@@ -52,56 +62,56 @@ class QRCodeGeneratorApp:
         self.bulk_entry_generate_btn.grid(row=3, column=0, columnspan=2, padx=5, pady=10)
 
         # Place frames
-        self.single_entry_frame.grid(row=1, column=0, columnspan=3, padx=10, pady=5)
-        self.bulk_entry_frame.grid(row=1, column=0, columnspan=3, padx=10, pady=5)
-        self.random_entry_frame.grid(row=1, column=0, columnspan=3, padx=10, pady=5)
+        self.single_entry_frame.grid(row=3, column=0, columnspan=3, padx=10, pady=5)
+        self.bulk_entry_frame.grid(row=3, column=0, columnspan=3, padx=10, pady=5)
+        self.random_entry_frame.grid(row=3, column=0, columnspan=3, padx=10, pady=5)
 
     def show_frame(self):
         mode = self.mode.get()
         if mode == "single":
-            self.single_entry_frame.grid(row=1, column=0, columnspan=3, padx=10, pady=5)
+            self.single_entry_frame.grid(row=3, column=0, columnspan=3, padx=10, pady=5)
             self.bulk_entry_frame.grid_forget()
             self.random_entry_frame.grid_forget()
         elif mode == "bulk":
             self.single_entry_frame.grid_forget()
-            self.bulk_entry_frame.grid(row=1, column=0, columnspan=3, padx=10, pady=5)
+            self.bulk_entry_frame.grid(row=3, column=0, columnspan=3, padx=10, pady=5)
             self.random_entry_frame.grid_forget()
         elif mode == "random":
             self.single_entry_frame.grid_forget()
             self.bulk_entry_frame.grid_forget()
-            self.random_entry_frame.grid(row=1, column=0, columnspan=3, padx=10, pady=5)
+            self.random_entry_frame.grid(row=3, column=0, columnspan=3, padx=10, pady=5)
 
     def generate_single_qr(self):
-        url = self.single_entry_url.get()
-        if url:
-            file_path = filedialog.asksaveasfilename(defaultextension=".pdf", filetypes=[("PDF files", "*.pdf")])
-            if file_path:
-                self.generate_qr_to_pdf(file_path, [url])
+        text = self.single_entry_url.get().upper()
+        if text:
+            file_path = f"{text}.pdf"
+            self.generate_qr_to_pdf(file_path, [text])
+            self.saved_location.set(f"PDF saved at: {file_path}")
 
     def generate_bulk_qr(self):
-        text = self.bulk_entry_text.get()
+        text = self.bulk_entry_text.get().upper()
         frm = int(self.bulk_entry_from.get())
         to = int(self.bulk_entry_to.get())
-        qr_data_list = [f"{text}{i}" for i in range(frm, to + 1)]
-        file_path = filedialog.asksaveasfilename(defaultextension=".pdf", filetypes=[("PDF files", "*.pdf")])
-        if file_path:
-            self.generate_qr_to_pdf(file_path, qr_data_list)
+        qr_data_list = [f"{text}{str(i).zfill(3)}" for i in range(frm, to + 1)]
+        file_path = f"{text} ({frm}-{to}).pdf"
+        self.generate_qr_to_pdf(file_path, qr_data_list)
+        self.saved_location.set(f"PDF saved at: {file_path}")
 
-    @staticmethod
-    def generate_qr_to_pdf(file_path, qr_data_list):
+    def generate_qr_to_pdf(self, file_path, qr_data_list):
+        qr_size = int(self.qr_size.get())
+        qr_per_row = 13 if qr_size == 10 else (8 if qr_size == 20 else 5)
+
         c = canvas.Canvas(file_path, pagesize=letter)
         page_width, page_height = letter
 
         x_start = 10 * mm
         y_start = page_height - 10 * mm
-        qr_size = 10
 
         qr_gap = 5 * mm
         qr_row_gap = 5 * mm
 
         qr_counter = 0
         num_rows = 1
-        last_row_y = y_start
 
         for qr_data in qr_data_list:
             qr = qrcode.QRCode(
@@ -130,16 +140,19 @@ class QRCodeGeneratorApp:
             x_start += qr_size * mm + qr_gap
             qr_counter += 1
 
-            if qr_counter >= 13:
+            if qr_counter >= qr_per_row:
                 qr_counter = 0
                 x_start = 10 * mm
                 y_start -= qr_size * mm + qr_row_gap
                 qr_row_start_x = x_start
                 qr_row_end_x = x_start
-                last_row_y = y_start + qr_size * mm
                 num_rows += 1
 
-        bottom_left_y = (y_start - qr_row_gap - qr_size * mm)- 5*mm
+                if y_start < 10 * mm:
+                    c.showPage()  # Add a new page if the images exceed the page
+                    y_start = page_height - 10 * mm
+
+        bottom_left_y = (y_start - qr_row_gap - qr_size * mm) - 5 * mm
         bottom_right_y = bottom_left_y
 
         c.setStrokeColorRGB(0, 0, 0)
@@ -159,7 +172,7 @@ class QRCodeGeneratorApp:
 
         c.line(page_width - x_margin, bottom_right_y, page_width - x_margin - 5 * mm, bottom_right_y)
         c.line(page_width - x_margin, bottom_right_y, page_width - x_margin, bottom_right_y + 5 * mm)
-
+        
         c.save()
 
 
