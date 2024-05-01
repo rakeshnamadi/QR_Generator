@@ -37,7 +37,6 @@ class QRCodeGeneratorApp:
 
         # Label to show saved location
         self.saved_location_label = tk.Label(self.master, textvariable=self.saved_location)
-        self.saved_location_label.grid(row=2, column=0, columnspan=3, padx=10, pady=5)
 
         # Single Entry Frame
         tk.Label(self.single_entry_frame, text="Enter TEXT:").pack()
@@ -61,10 +60,22 @@ class QRCodeGeneratorApp:
                                                  command=self.generate_bulk_qr)
         self.bulk_entry_generate_btn.grid(row=3, column=0, columnspan=2, padx=5, pady=10)
 
+        # Random Entry Frame
+        tk.Label(self.random_entry_frame, text="Enter QR Code Text:").grid(row=0, column=0, padx=5, pady=5)
+        self.random_entry_text = tk.Text(self.random_entry_frame, height=5, width=50)
+        self.random_entry_text.grid(row=0, column=1, padx=5, pady=5)
+        tk.Label(self.random_entry_frame, text="Enter QR Code Labeling:").grid(row=1, column=0, padx=5, pady=5)
+        self.random_entry_labeling = tk.Text(self.random_entry_frame, height=5, width=50)
+        self.random_entry_labeling.grid(row=1, column=1, padx=5, pady=5)
+        self.random_entry_generate_btn = tk.Button(self.random_entry_frame, text="Generate QR",
+                                                   command=self.generate_random_qr)
+        self.random_entry_generate_btn.grid(row=2, column=0, columnspan=2, padx=5, pady=10)
+
         # Place frames
         self.single_entry_frame.grid(row=3, column=0, columnspan=3, padx=10, pady=5)
         self.bulk_entry_frame.grid(row=3, column=0, columnspan=3, padx=10, pady=5)
         self.random_entry_frame.grid(row=3, column=0, columnspan=3, padx=10, pady=5)
+        self.saved_location_label.grid(row=4, column=0, columnspan=3, padx=10, pady=5)
 
     def show_frame(self):
         mode = self.mode.get()
@@ -84,7 +95,7 @@ class QRCodeGeneratorApp:
     def generate_single_qr(self):
         text = self.single_entry_url.get().upper()
         if text:
-            file_path = f"{text}.pdf"
+            file_path = f"{text.replace('/', '-')}.pdf"
             self.generate_qr_to_pdf(file_path, [text])
             self.saved_location.set(f"PDF saved at: {file_path}")
 
@@ -93,11 +104,21 @@ class QRCodeGeneratorApp:
         frm = int(self.bulk_entry_from.get())
         to = int(self.bulk_entry_to.get())
         qr_data_list = [f"{text}{str(i).zfill(3)}" for i in range(frm, to + 1)]
-        file_path = f"{text} ({frm}-{to}).pdf"
+        file_path = f"{text.replace('/', '-')} ({frm}-{to}).pdf"
         self.generate_qr_to_pdf(file_path, qr_data_list)
         self.saved_location.set(f"PDF saved at: {file_path}")
 
-    def generate_qr_to_pdf(self, file_path, qr_data_list):
+    def generate_random_qr(self):
+        qr_data = self.random_entry_text.get("1.0", "end-1c").upper().split("\n")
+        qr_labeling = self.random_entry_labeling.get("1.0", "end-1c").split("\n")
+        qr_data_list = [data.strip() for data in qr_data if data.strip()]
+        qr_labeling_list = [label.strip() for label in qr_labeling if label.strip()]
+        if qr_data_list:
+            file_path = f"random_qr.pdf"
+            self.generate_qr_to_pdf(file_path, qr_data_list, qr_labeling_list)
+            self.saved_location.set(f"PDF saved at: {file_path}")
+
+    def generate_qr_to_pdf(self, file_path, qr_data_list, qr_labeling_list=None):
         qr_size = int(self.qr_size.get())
         qr_per_row = 13 if qr_size == 10 else (8 if qr_size == 20 else 5)
 
@@ -113,7 +134,7 @@ class QRCodeGeneratorApp:
         qr_counter = 0
         num_rows = 1
 
-        for qr_data in qr_data_list:
+        for qr_data, qr_labeling in zip(qr_data_list, qr_labeling_list or [""] * len(qr_data_list)):
             qr = qrcode.QRCode(
                 version=None,
                 error_correction=qrcode.constants.ERROR_CORRECT_L,
@@ -126,7 +147,7 @@ class QRCodeGeneratorApp:
             img_path = f"temp_qr_{qr_size}.png"
             img.save(img_path)
 
-            size_text = qr_data
+            size_text = qr_labeling if qr_labeling else qr_data
             font_size = 8
 
             text_x = x_start + (qr_size * mm - c.stringWidth(size_text, "Helvetica", font_size)) / 2
