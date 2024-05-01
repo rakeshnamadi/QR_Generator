@@ -1,68 +1,55 @@
-from reportlab.lib.pagesizes import A4
-from reportlab.lib.units import mm
+import qrcode
+from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
+from reportlab.lib.units import inch, mm
 
-def generate_pdf(filename):
-    c = canvas.Canvas(filename, pagesize=A4)
-    width, height = A4
-    print(width, height)
-    print("in mm: ", width * mm, height * mm)
+def generate_qr_codes_to_pdf(file_path, qr_data_list, qr_size_list):
+    c = canvas.Canvas(file_path, pagesize=letter)
+    page_width, page_height = letter
 
-    # Define dimensions of the grid
-    border_size = 10 * mm
-    usable_width = width - (2 * border_size)
-    usable_height = height - (2 * border_size)
-    box_size = 20 * mm
-    print("1mm=", 1 * mm)
-    # Calculate the number of rows and columns
-    rows = int(usable_height / box_size)
-    cols = int(usable_width / box_size)
-    print("rows: ", rows, "cols: ", cols, "usable_height: ", usable_height, "usable_width: ", usable_width)
-    # Calculate the starting point for the grid
-    start_x = border_size
-    print("start_x: ", start_x)
-    start_y = height - border_size - usable_height
-    print("start_y: ", start_y)
+    # Set margins and gap
+    x_margin = 10 * mm  # Left margin
+    y_margin = 10 * mm  # Top margin
+    qr_gap = 5 * mm  # Gap between QR codes
 
-    # Draw the grid
-    for row in range(rows):
-        for col in range(cols):
-            x = start_x + col * box_size
-            print(x)
-            y = start_y + (row * box_size)
-            print(y)
-            c.rect(x, y, box_size, box_size)
+    qr_size = 10  # Fixed size for QR codes
 
-    # Draw "L" shapes at each corner with a 5mm distance from the grid
-    l_shape_size = 5 * mm
-    l_shape_distance = 5 * mm
-    
-    # Top left corner
-    c.setStrokeColorRGB(0, 0, 0)
-    c.line(start_x - l_shape_distance, start_y - l_shape_distance,
-           start_x - l_shape_distance, start_y - l_shape_distance - l_shape_size)
-    c.line(start_x - l_shape_distance, start_y - l_shape_distance,
-           start_x - l_shape_distance - l_shape_size, start_y - l_shape_distance)
+    x_start = x_margin  # Start from left margin
+    y_start = page_height - y_margin  # Start from top margin
 
-    # Top right corner
-    c.line(width - start_x + l_shape_distance, start_y - l_shape_distance,
-           width - start_x + l_shape_distance + l_shape_size, start_y - l_shape_distance)
-    c.line(width - start_x + l_shape_distance, start_y - l_shape_distance,
-           width - start_x + l_shape_distance, start_y - l_shape_distance - l_shape_size)
+    for qr_data in qr_data_list:
+        qr = qrcode.QRCode(
+            version=None,
+            error_correction=qrcode.constants.ERROR_CORRECT_L,
+            box_size=qr_size,
+            border=2,
+        )
+        qr.add_data(qr_data)
+        qr.make(fit=True)
+        img = qr.make_image(fill_color="black", back_color="orange")  # Change background color to orange
+        img_path = f"temp_qr_{qr_size}.png"
+        img.save(img_path)
 
-    # Bottom left corner
-    c.line(start_x - l_shape_distance, height - start_y + l_shape_distance,
-           start_x - l_shape_distance, height - start_y + l_shape_distance + l_shape_size)
-    c.line(start_x - l_shape_distance, height - start_y + l_shape_distance,
-           start_x - l_shape_distance - l_shape_size, height - start_y + l_shape_distance)
+        # Draw QR code
+        c.drawImage(img_path, x_start, y_start - qr_size * mm, width=qr_size * mm, height=qr_size * mm)
 
-    # Bottom right corner
-    c.line(width - start_x + l_shape_distance, height - start_y + l_shape_distance,
-           width - start_x + l_shape_distance + l_shape_size, height - start_y + l_shape_distance)
-    c.line(width - start_x + l_shape_distance, height - start_y + l_shape_distance,
-           width - start_x + l_shape_distance, height - start_y + l_shape_distance + l_shape_size)
+        # Add size text under each QR code
+        size_text = f"{qr_size}X{qr_size}"
+        # Adjust the font size
+        font_size = 8
+        text_width = c.stringWidth(size_text, "Helvetica", font_size)
+        # Adjust the x-coordinate for the second text
+        text_x = x_start + (qr_size * mm - text_width) / 2
+        # Add an offset to the y-coordinate for the first text
+        text_y = y_start - qr_size * mm - 5  # 10mm gap below QR code
+        c.setFont("Helvetica", font_size)
+        c.drawString(text_x, text_y, size_text)
+
+        # Update x position for next QR code
+        x_start += qr_size * mm + qr_gap
 
     c.save()
 
 if __name__ == "__main__":
-    generate_pdf("grid_with_border_and_L_shapes.pdf")
+    qr_data_list = ["https://example.com"] * 14  # Only one URL repeated for demonstration
+    generate_qr_codes_to_pdf("qr_codes.pdf", qr_data_list, [10] * len(qr_data_list))  # QR size is 10mm
